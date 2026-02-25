@@ -198,7 +198,7 @@
   </div>
 
 <script>
-const baseUrl = 'http://localhost:8080';
+const baseUrl = window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
 let currentPage = 1;
 let allTopics = [];
 const size = 30;

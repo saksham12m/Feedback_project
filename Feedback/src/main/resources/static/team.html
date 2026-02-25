@@ -205,7 +205,7 @@
   </div>
 
   <script>
-  const baseUrl = 'http://localhost:8080';
+  const baseUrl = window.location.protocol + "//" + window.location.hostname + ":" + window.location.port;
   const urlParams = new URLSearchParams(window.location.search);
   const topicIdFromUrl = urlParams.get('topicId'); 
 

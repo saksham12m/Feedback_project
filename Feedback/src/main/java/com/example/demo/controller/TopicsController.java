@@ -19,6 +19,7 @@ import com.example.demo.entity.Topics;
 import com.example.demo.service.TeamsServiceImpl;
 import com.example.demo.service.TopicsServiceInt;
 
+@CrossOrigin(origins = "*")
 @RestController
 public class TopicsController {
 

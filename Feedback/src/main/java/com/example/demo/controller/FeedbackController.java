@@ -17,6 +17,7 @@ import com.example.demo.dto.FeedbacksDto;
 import com.example.demo.entity.Feedbacks;
 import com.example.demo.service.FeedbackServiceInt;
 
+@CrossOrigin(origins = "*")
 @RestController
 public class FeedbackController {
 
