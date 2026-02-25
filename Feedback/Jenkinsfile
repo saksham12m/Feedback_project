@@ -1,0 +1,57 @@
+pipeline {
+    agent any
+    tools {
+        maven 'maven3'
+        jdk 'jdk17'
+    }
+    environment {
+        // This pulls your DB username/password from the 'db-credentials' ID you created
+        DB_CREDS = credentials('db-credentials')
+    }
+    stages {
+        stage('Checkout Code') {
+            steps {
+                // This pulls the code from GitHub
+                git branch: 'main', credentialsId: 'github-creds', url: 'https://github.com/saksham12m/Feedbak_project.git'
+            }
+        }
+        stage('Maven Build') {
+            steps {
+                // This creates the JAR file in the target folder
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+        stage('Deploy to Dev (Port 9091)') {
+            steps {
+                script {
+                    sh "docker build -t feedback-app:dev ."
+                    sh "docker rm -f feedback-dev || true"
+                    sh """
+                        docker run -d --name feedback-dev \
+                        -p 9091:8080 --network jenkins-net \
+                        -e "SPRING_PROFILES_ACTIVE=dev" \
+                        -e "DB_USER=${DB_CREDS_USR}" \
+                        -e "DB_PASSWORD=${DB_CREDS_PSW}" \
+                        feedback-app:dev
+                    """
+                }
+            }
+        }
+        stage('Deploy to Prod (Port 9092)') {
+            steps {
+                script {
+                    sh "docker build -t feedback-app:prod ."
+                    sh "docker rm -f feedback-prod || true"
+                    sh """
+                        docker run -d --name feedback-prod \
+                        -p 9092:8080 --network jenkins-net \
+                        -e "SPRING_PROFILES_ACTIVE=prod" \
+                        -e "DB_USER=${DB_CREDS_USR}" \
+                        -e "DB_PASSWORD=${DB_CREDS_PSW}" \
+                        feedback-app:prod
+                    """
+                }
+            }
+        }
+    }
+}
