@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reviews</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.01em; overflow: hidden; }
+    #sidebar { width: 260px; min-width: 260px; background: #0f172a; transition: all 0.4s ease; }
+    @media (max-width: 768px) { #sidebar { position: fixed; left: -260px; z-index: 50; } #sidebar.mobile-open { left: 0; } }
+    .nav-list-item { transition: all 0.3s ease; margin: 2px 12px; border-radius: 10px; }
+    .nav-list-item a { display: flex; align-items: center; gap: 10px; padding: 0.7rem 1rem; color: #94a3b8; font-size: 0.9rem; }
+    .nav-list-item.active { background: rgba(79, 70, 229, 0.1); }
+    .nav-list-item.active a { color: #818cf8; font-weight: 600; }
+    
+    /* Table Border Updates */
+    .data-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+    .data-table thead th { 
+        background: #f8fafc; padding: 12px 20px; text-align: left; 
+        font-size: 10px; font-weight: 800; color: #64748b; 
+        text-transform: uppercase; letter-spacing: 0.1em;
+        border-bottom: 1px solid #f1f5f9; 
+        border-right: 1px solid #f1f5f9; /* Vertical light border */
+        position: sticky; top: 0; z-index: 10;
+    }
+    .data-table thead th:last-child { border-right: none; }
+    
+    .data-table td { 
+        padding: 12px 20px; font-size: 13px; color: #1e293b; 
+        border-bottom: 1px solid #f1f5f9; /* Horizontal light border */
+        border-right: 1px solid #f1f5f9;  /* Vertical light border */
+        vertical-align: middle; 
+    }
+    .data-table td:last-child { border-right: none; }
+    
+    .delete-row-btn { 
+        width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; 
+        color: #94a3b8; border-radius: 6px; cursor: pointer; transition: 0.2s; 
+    }
+    .delete-row-btn:hover { color: #ef4444; background: #fee2e2; }
+
+    /* Dynamic Capsule Style */
+    .team-capsule {
+        display: inline-block;
+        max-width: 100%;
+        word-wrap: break-word;
+        white-space: normal;
+        padding: 4px 12px;
+        background: #f5f3ff; 
+        color: #4f46e5; 
+        border: 1px solid #e0e7ff;
+        border-radius: 9999px;
+        font-size: 9px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+    }
+
+    .toast { position: fixed; top: 20px; right: 20px; min-width: 280px; border-radius: 12px; transform: translateX(120%); transition: 0.4s ease; z-index: 9999; padding: 14px 20px; color: white; font-weight: 600; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+    .toast.show { transform: translateX(0); }
+    
+    .loader {
+      width: 20px; height: 20px; border: 3px solid #e2e8f0; border-bottom-color: #4f46e5;
+      border-radius: 50%; display: inline-block; animation: rotation 1s linear infinite;
+    }
+    @keyframes rotation { 0% { transform: rotate(0deg) } 100% { transform: rotate(360deg) } }
+  </style>
+</head>
+<body class="bg-[#f8fafc] flex h-screen overflow-hidden">
+
+  <button id="menuToggle" class="fixed top-4 left-4 z-50 bg-[#0f172a] text-white p-2.5 rounded-lg shadow-lg md:hidden">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+  </button>
+  <div id="overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-40"></div>
+
+  <div id="sidebar" class="h-screen text-white flex flex-col z-50">
+    <div class="p-6 text-xl font-extrabold border-b border-slate-800/50 flex items-center gap-3">
+        <span class="bg-indigo-600 p-1.5 rounded-lg text-sm">🏛️</span> Admin
+    </div>
+    <ul class="nav-list flex-grow mt-6">
+      <li class="nav-list-item"><a href="topic.html"><span>📚</span> Topics</a></li>
+      <li class="nav-list-item"><a href="team.html"><span>👥</span> Teams</a></li>
+      <li class="nav-list-item active"><a href="review.html"><span>⭐</span> Feedbacks</a></li>
+    </ul>
+  </div>
+
+  <div id="main-content" class="flex-grow p-4 overflow-hidden flex flex-col">
+    <div id="toastContainer"></div>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 flex flex-col h-full overflow-hidden"> 
+      <div class="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <h1 class="text-xl font-extrabold text-slate-900 tracking-tight" id="pageTitle">Feedbacks</h1>
+        </div>
+        <button id="deleteAllBtn" class="px-5 py-2.5 text-orange-600 bg-orange-50 rounded-xl font-bold text-xs hover:bg-orange-100 transition-all">
+        🗑️ Clear All</button>
+      </div>
+
+      <div class="flex-grow overflow-auto bg-slate-50/30">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th width="140">📚 Topics</th>
+              <th width="160">👥 Teams</th>
+              <th width="100">📅 Dates</th>
+              <th>💬 Feedbacks</th>
+              <th width="60">🗑️</th>
+            </tr>
+          </thead>
+          <tbody id="feedbackTableBody"></tbody>
+        </table>
+        <div id="emptyState" class="hidden text-center py-24 text-slate-400 font-bold italic">No feedback entries found.</div>
+      </div>
+
+      <div class="px-8 py-1 bg-white border-t border-slate-100 flex items-center justify-between" id="paginationBar">
+          <span class="text-slate-500 text-xs font-bold" id="pageNumDisplay">Page 1</span>
+          <div class="flex gap-3">
+              <button id="prevBtn" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-500 disabled:opacity-40">Previous</button>
+              <button id="nextBtn" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">Next Page</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <div id="confirmModal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white p-6 rounded-2xl max-w-xs w-full text-center shadow-xl">
+        <h3 class="text-lg font-bold text-slate-900 mb-2" id="confirmTitle">Confirm</h3>
+        <p class="text-xs text-slate-500 mb-6" id="confirmMessage">Are you sure?</p>
+        <div class="flex gap-2">
+            <button id="confirmCancel" class="flex-1 py-2.5 bg-slate-100 rounded-xl font-bold text-xs uppercase">Cancel</button>
+            <button id="confirmAction" class="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold text-xs uppercase">Delete</button>
+        </div>
+    </div>
+  </div>
+
+<script>
+const baseUrl = 'http://localhost:8080';
+const urlParams = new URLSearchParams(window.location.search);
+const teamIdFromUrl = urlParams.get('teamId'); 
+
+let currentPage = 1;
+const size = 30;
+let topicMap = {};
+let pendingAction = null;
+
+async function handleBackendError(err, defaultMsg) {
+    if (err && typeof err.json === 'function') {
+        try {
+            const data = await err.json();
+            const msg = data.message || data.error || data.detail || defaultMsg;
+            showToast(msg, 'error');
+        } catch (e) {
+            showToast(defaultMsg, 'error');
+        }
+    } else {
+        showToast(defaultMsg, 'error');
+    }
+}
+
+const api = {
+  getTopics: () => fetch(`${baseUrl}/topics?pageNo=1&size=100`).then(r => r.json()),
+  list: async (p) => {
+    const res = await fetch(`${baseUrl}/feedbacks?pageNo=${p}&size=${size}`);
+    if (!res.ok) throw res;
+    return await res.json();
+  },
+  getByTeam: async (id) => {
+    const res = await fetch(`${baseUrl}/feedbacks/${id}`);
+    if (!res.ok) throw res;
+    return await res.json();
+  },
+  delete: async (id) => {
+    const res = await fetch(`${baseUrl}/feedback/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw res;
+    return res;
+  },
+  deleteAll: async () => {
+    const res = await fetch(`${baseUrl}/feedbacks`, { method: 'DELETE' });
+    if (!res.ok) throw res;
+    return res;
+  }
+};
+
+function showToast(msg, type = 'info') {
+  const bg = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-red-600' : 'bg-indigo-600');
+  const toast = $(`<div class="toast ${bg}">${msg}</div>`);
+  $('#toastContainer').append(toast);
+  setTimeout(() => toast.addClass('show'), 100);
+  setTimeout(() => { toast.removeClass('show'); setTimeout(() => toast.remove(), 400); }, 3000);
+}
+
+function showConfirmation(title, message, onConfirm) {
+  $('#confirmTitle').text(title); $('#confirmMessage').text(message);
+  pendingAction = onConfirm; $('#confirmModal').removeClass('hidden').addClass('flex');
+}
+
+$('#confirmAction').click(() => { 
+    $('#confirmModal').addClass('hidden').removeClass('flex'); 
+    if(pendingAction) { pendingAction(); pendingAction = null; } 
+});
+$('#confirmCancel').click(() => $('#confirmModal').addClass('hidden').removeClass('flex'));
+
+async function initialize() {
+  try {
+    const topics = await api.getTopics();
+    topics.forEach(t => { topicMap[t.id] = t.name; });
+    loadFeedbacks();
+  } catch (err) { handleBackendError(err, 'Sync failed'); }
+}
+
+async function loadFeedbacks() {
+  const tbody = $('#feedbackTableBody');
+  tbody.html('<tr><td colspan="5" class="text-center py-10"><span class="loader"></span></td></tr>');
+
+  try {
+    let data;
+    if (teamIdFromUrl) {
+      $('#paginationBar').addClass('hidden');
+      data = await api.getByTeam(teamIdFromUrl);
+      const teamName = (data && data.length > 0 && data[0].teams) ? data[0].teams.name : 'Selected Team';
+      $('#pageTitle').html(`Team: <span class="text-indigo-600">${teamName}</span>`);
+    } else {
+      $('#pageTitle').text('All Feedbacks');
+      $('#paginationBar').removeClass('hidden');
+      data = await api.list(currentPage);
+      $('#pageNumDisplay').text(`Page ${currentPage}`);
+      $('#prevBtn').prop('disabled', currentPage === 1);
+      $('#nextBtn').prop('disabled', !data || data.length < size);
+    }
+    
+    if (Array.isArray(data)) {
+        renderTable(data.reverse());
+    } else {
+        renderTable([]);
+    }
+  } catch (err) { 
+    tbody.empty();
+    handleBackendError(err, 'Error loading data'); 
+  }
+}
+
+function renderTable(list) {
+  const tbody = $('#feedbackTableBody').empty();
+  if (!list || list.length === 0) { $('#emptyState').removeClass('hidden'); return; }
+  $('#emptyState').addClass('hidden');
+
+  list.forEach(item => {
+    const topicName = (item.teams && item.teams.topics) ? item.teams.topics.name : (item.teams ? (topicMap[item.teams.topicId] || 'N/A') : 'N/A');
+    const teamName = (item.teams) ? item.teams.name : 'N/A';
+    
+    const row = $(`
+      <tr>
+        <td class="text-slate-800 text-[11px] font-bold tracking-tight">${topicName}</td>
+        <td>
+            <div class="team-capsule">
+                ${teamName}
+            </div>
+        </td>
+        <td>
+          <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter whitespace-nowrap">📅 ${item.date || 'N/A'}</span>
+        </td>
+        <td class="font-semibold text-slate-600 leading-tight pr-4 text-xs whitespace-normal break-words">${item.feedback}</td>
+        <td>
+          <button class="delete-row-btn" data-id="${item.id}">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+        </td>
+      </tr>
+    `);
+    tbody.append(row);
+  });
+}
+
+$(document).on('click', '.delete-row-btn', function() {
+  const id = $(this).data('id');
+  showConfirmation('Delete entry?', 'This is permanent.', async () => {
+    try { 
+        await api.delete(id); 
+        showToast('Deleted', 'success'); 
+        loadFeedbacks(); 
+    } catch(err) { 
+        handleBackendError(err, 'Failed to delete'); 
+    }
+  });
+});
+
+$('#deleteAllBtn').click(() => {
+  showConfirmation('Clear All?', 'Delete all records?', async () => {
+    try { 
+        await api.deleteAll(); 
+        showToast('All Cleared', 'success'); 
+        loadFeedbacks(); 
+    } catch(err) { 
+        handleBackendError(err, 'Failed to clear'); 
+    }
+  });
+});
+
+// Sidebar Controls
+$('#menuToggle').click(() => { $('#sidebar').toggleClass('mobile-open'); $('#overlay').toggleClass('hidden'); });
+$('#overlay').click(() => { $('#sidebar').removeClass('mobile-open'); $('#overlay').addClass('hidden'); });
+
+$('#prevBtn').click(() => { if(currentPage > 1) { currentPage--; loadFeedbacks(); } });
+$('#nextBtn').click(() => { currentPage++; loadFeedbacks(); });
+
+$(document).ready(initialize);
+</script>
+</body>
+</html>
