@@ -1,54 +1,66 @@
 pipeline {
     agent any
+    
+    parameters {
+        choice(name: 'TARGET_ENV', choices: ['DEV', 'PROD'], description: 'Select the Environment for Deployment')
+    }
+
     tools {
         maven 'maven3'
         jdk 'jdk17'
     }
-    environment {
-        // This pulls your DB username/password from the 'db-credentials' ID you created
-        DB_CREDS = credentials('db-credentials')
-    }
+
     stages {
-        stage('Checkout Code') {
+        stage('Cleanup & Checkout') {
             steps {
-                // This pulls the code from GitHub
-                git branch: 'main', credentialsId: 'github-creds', url: 'https://github.com/saksham12m/Feedbak_project.git'
-            }
-        }
-        stage('Maven Build') {
-            steps {
-                // This creates the JAR file in the target folder
-                sh 'mvn clean package -DskipTests'
-            }
-        }
-        stage('Deploy to Dev (Port 9091)') {
-            steps {
+                cleanWs()
                 script {
-                    sh "docker build -t feedback-app:dev ."
-                    sh "docker rm -f feedback-dev || true"
+                    git branch: 'main', credentialsId: 'github-creds', url: 'https://github.com/saksham12m/Feedback_project.git'
+                    env.POM_PATH = sh(script: 'find . -name "pom.xml" -printf "%h" -quit', returnStatus: false, returnStdout: true).trim()
+                }
+            }
+        }
+
+        stage('Maven Build') {
+            when { expression { params.TARGET_ENV == 'DEV' } }
+            steps {
+                sh "cd ${env.POM_PATH} && mvn clean package -DskipTests"
+                sh "docker build -t feedback-app:latest ${env.POM_PATH}/."
+            }
+        }
+
+        stage('Deploy to Dev') {
+            when { expression { params.TARGET_ENV == 'DEV' } }
+            steps {
+                // This block ensures the password is bound correctly right when needed
+                withCredentials([usernamePassword(credentialsId: 'db-credentials', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    sh "docker rm -f Feedback-dev || true"
                     sh """
-                        docker run -d --name feedback-dev \
+                        docker run -d --name Feedback-dev \
                         -p 9091:8080 --network jenkins-net \
-                        -e "SPRING_PROFILES_ACTIVE=dev" \
-                        -e "DB_USER=${DB_CREDS_USR}" \
-                        -e "DB_PASSWORD=${DB_CREDS_PSW}" \
-                        feedback-app:dev
+                        -e "SPRING_DATASOURCE_URL=jdbc:postgresql://feedback-db-dev:5432/Feedback" \
+                        -e "SPRING_DATASOURCE_USERNAME=postgres" \
+                        -e "SPRING_DATASOURCE_PASSWORD=${PASS}" \
+                        -e "SPRING_JPA_HIBERNATE_DDL_AUTO=update" \
+                        feedback-app:latest
                     """
                 }
             }
         }
-        stage('Deploy to Prod (Port 9092)') {
+
+        stage('Deploy to Prod') {
+            when { expression { params.TARGET_ENV == 'PROD' } }
             steps {
-                script {
-                    sh "docker build -t feedback-app:prod ."
-                    sh "docker rm -f feedback-prod || true"
+                withCredentials([usernamePassword(credentialsId: 'db-credentials', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    sh "docker rm -f Feedback-prod || true"
                     sh """
-                        docker run -d --name feedback-prod \
+                        docker run -d --name Feedback-prod \
                         -p 9092:8080 --network jenkins-net \
-                        -e "SPRING_PROFILES_ACTIVE=prod" \
-                        -e "DB_USER=${DB_CREDS_USR}" \
-                        -e "DB_PASSWORD=${DB_CREDS_PSW}" \
-                        feedback-app:prod
+                        -e "SPRING_DATASOURCE_URL=jdbc:postgresql://feedback-db-prod:5432/Feedback" \
+                        -e "SPRING_DATASOURCE_USERNAME=postgres" \
+                        -e "SPRING_DATASOURCE_PASSWORD=${PASS}" \
+                        -e "SPRING_JPA_HIBERNATE_DDL_AUTO=update" \
+                        feedback-app:latest
                     """
                 }
             }
